@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>国风色卡 · 中国传统色取色板</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <h1>国风色卡</h1>
+  <p>中国传统色取色板 · 搜索、复制、随机配色</p>
+</header>
+
+<main>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="搜索颜色名或色值，例如 竹青 / 789262" autocomplete="off">
+    <button id="random" type="button">随机配色</button>
+    <span id="count" class="count"></span>
+  </section>
+
+  <section id="palette" class="palette" aria-label="随机配色结果"></section>
+
+  <section id="grid" class="grid" aria-label="传统色列表"></section>
+</main>
+
+<footer>
+  <p>48 个中国传统色 · 色值仅供设计参考</p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="colors.js"></script>
+<script>
+const state = { keyword: "" };
+const grid = document.getElementById("grid");
+const palette = document.getElementById("palette");
+const search = document.getElementById("search");
+const countEl = document.getElementById("count");
+const toast = document.getElementById("toast");
+
+function matches(c) {
+  const k = state.keyword.trim().toLowerCase();
+  if (!k) return true;
+  const hex = c.hex.replace("#", "").toLowerCase();
+  return c.name.includes(state.keyword.trim()) || hex.includes(k) || c.note.includes(state.keyword.trim());
+}
+
+function showToast(text) {
+  toast.textContent = text;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 1400);
+}
+
+async function copyHex(hex) {
+  try {
+    await navigator.clipboard.writeText(hex);
+    showToast("已复制 " + hex);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = hex;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); showToast("已复制 " + hex); }
+    catch (err) { showToast("复制失败，请手动选择"); }
+    ta.remove();
+  }
+}
+
+function render() {
+  const list = COLORS.filter(matches);
+  countEl.textContent = `共 ${list.length} / ${COLORS.length} 色`;
+  grid.innerHTML = "";
+  for (const c of list) {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="swatch" style="background:${c.hex}"></div>
+      <div class="meta">
+        <h2>${c.name}</h2>
+        <code>${c.hex}</code>
+        <p>${c.note}</p>
+      </div>`;
+    card.addEventListener("click", () => copyHex(c.hex));
+    card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") copyHex(c.hex); });
+    grid.appendChild(card);
+  }
+  if (!list.length) {
+    grid.innerHTML = `<p class="empty">没有匹配的颜色，换个关键词试试。</p>`;
+  }
+}
+
+function randomPalette() {
+  const pool = COLORS.filter(matches);
+  if (pool.length < 5) { showToast("筛选结果不足 5 色"); return; }
+  const picked = [];
+  const used = new Set();
+  while (picked.length < 5) {
+    const i = Math.floor(Math.random() * pool.length);
+    if (used.has(i)) continue;
+    used.add(i);
+    picked.push(pool[i]);
+  }
+  palette.innerHTML = picked.map((c, i) => `
+    <div class="chip" style="background:${c.hex}" title="点击复制 ${c.hex}" data-hex="${c.hex}">
+      <span>${c.name}</span><code>${c.hex}</code>
+      <small>${i + 1}</small>
+    </div>`).join("");
+  [...palette.querySelectorAll(".chip")].forEach((el) => {
+    el.addEventListener("click", () => copyHex(el.dataset.hex));
+  });
+}
+
+search.addEventListener("input", () => { state.keyword = search.value; render(); });
+document.getElementById("random").addEventListener("click", randomPalette);
+
+render();
+</script>
+</body>
+</html>
